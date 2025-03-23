@@ -1,14 +1,12 @@
 {
   "name": "monitor-polling",
   "version": "1.0.0",
-  "type": "module",
-  "main": "monitorPolling.ts",
+  "main": "monitorPolling.js",
   "scripts": {
-    "start": "ts-node monitorPolling.ts"
+    "start": "node monitorPolling.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.5",
-    "stellar-sdk": "^10.4.0",
-    "ts-node": "^10.9.1"
+    "stellar-sdk": "^10.6.1"
   }
 }
