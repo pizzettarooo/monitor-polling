@@ -9,7 +9,7 @@
   "dependencies": {
     "@supabase/supabase-js": "^2.39.5",
     "node-fetch": "^2.6.7",
-    "stellar-sdk": "^10.5.1",
+    "stellar-sdk": "^10.4.0",  // ✅ versione giusta
     "ts-node": "^10.9.2"
   }
 }
