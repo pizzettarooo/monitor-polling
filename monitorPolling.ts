@@ -1,71 +1,57 @@
-import { createClient } from '@supabase/supabase-js'
-import 'dotenv/config'
-import fetch from 'node-fetch'
+import fetch from 'node-fetch';
+import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = process.env.SUPABASE_URL!
-const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!
-const WALLET_ADDRESS = process.env.WALLET_ADDRESS!
-const LAST_TIMESTAMP_KEY = 'last_transaction_ts'
+const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
+const STELLAR_API_URL = 'https://api.stellar.expert/explorer/testnet/account/';
+const SITE_WALLET = 'GCMEELHBN6VBVFGVRRD7PAGJZY63F3PWA4CL6QGXCYNMFPFL6J77B2RV';
 
-const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY)
+let lastTimestamp: number = Date.now();
 
-async function getTransactions() {
-  const url = `https://api.mainnet.minepi.com/transactions?account=${WALLET_ADDRESS}&limit=10`
-  const res = await fetch(url)
-  const json = await res.json()
-  return json._embedded.records
-}
+async function checkNewTransactions() {
+  try {
+    const res = await fetch(`${STELLAR_API_URL}${SITE_WALLET}/payments?limit=50&order=desc`);
+    const data = await res.json();
 
-async function getLastTimestamp(): Promise<string | null> {
-  const { data, error } = await supabase
-    .from('system')
-    .select('value')
-    .eq('key', LAST_TIMESTAMP_KEY)
-    .single()
+    const newTxs = data._embedded.records.filter((tx: any) =>
+      tx.to === SITE_WALLET && new Date(tx.created_at).getTime() > lastTimestamp
+    );
 
-  return error ? null : data?.value ?? null
-}
+    if (newTxs.length) {
+      console.log(`📥 Trovate ${newTxs.length} nuove transazioni.`);
 
-async function setLastTimestamp(timestamp: string) {
-  await supabase
-    .from('system')
-    .upsert({ key: LAST_TIMESTAMP_KEY, value: timestamp }, { onConflict: 'key' })
-}
+      for (const tx of newTxs) {
+        const sender = tx.from;
+        const amount = parseFloat(tx.amount);
 
-async function creditUser(wallet: string, amount: number) {
-  const { data: user } = await supabase
-    .from('users')
-    .select('id, credits')
-    .eq('wallet', wallet)
-    .single()
+        const { data: user } = await supabase.from('users').select('id, credits').eq('wallet', sender).single();
+        if (!user) {
+          console.warn(`⚠️ Nessun utente registrato con wallet ${sender}`);
+          continue;
+        }
 
-  if (!user) return
+        await supabase
+          .from('users')
+          .update({ credits: user.credits + Math.floor(amount) })
+          .eq('id', user.id);
 
-  await supabase.from('transactions').insert({
-    id: crypto.randomUUID(),
-    user_id: user.id,
-    amount,
-    type: 'deposit'
-  })
+        await supabase.from('transactions').insert({
+          id: tx.id,
+          user_id: user.id,
+          amount,
+          type: 'deposit'
+        });
 
-  await supabase
-    .from('users')
-    .update({ credits: user.credits + amount })
-    .eq('id', user.id)
-}
+        console.log(`✅ Aggiornati i crediti per ${sender}: +${Math.floor(amount)} Pi`);
+      }
 
-async function main() {
-  const lastTS = await getLastTimestamp()
-  const txs = await getTransactions()
-
-  for (const tx of txs.reverse()) {
-    if (lastTS && tx.created_at <= lastTS) continue
-    const amount = parseFloat(tx.amount)
-    const sender = tx.source_account
-    console.log(`Nuova transazione da ${sender} (${amount} Pi)`)
-    await creditUser(sender, Math.floor(amount))
-    await setLastTimestamp(tx.created_at)
+      const latest = new Date(newTxs[0].created_at).getTime();
+      lastTimestamp = latest;
+    } else {
+      console.log('🔍 Nessuna nuova transazione trovata.');
+    }
+  } catch (err) {
+    console.error('❌ Errore durante il polling:', err);
   }
 }
 
-main().catch(console.error)
+setInterval(checkNewTransactions, 60 * 1000);

@@ -2,16 +2,14 @@
   "name": "monitor-polling",
   "version": "1.0.0",
   "type": "module",
+  "main": "monitorPolling.ts",
   "scripts": {
-    "start": "ts-node monitorPolling.ts"
+    "start": "ts-node --loader ts-node/esm monitorPolling.ts"
   },
   "dependencies": {
-    "dotenv": "^16.0.0",
-    "@supabase/supabase-js": "^2.0.0",
-    "node-fetch": "^3.0.0"
-  },
-  "devDependencies": {
-    "ts-node": "^10.0.0",
-    "typescript": "^5.0.0"
+    "@supabase/supabase-js": "^2.39.5",
+    "node-fetch": "^2.6.7",
+    "stellar-sdk": "^10.4.0",
+    "ts-node": "^10.9.2"
   }
 }
