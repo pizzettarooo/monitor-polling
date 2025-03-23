@@ -1,18 +1,18 @@
-import { createClient } from "@supabase/supabase-js";
-import { Server } from "stellar-sdk";
+const { createClient } = require('@supabase/supabase-js');
+const { Server } = require('stellar-sdk');
 
+// Configurazioni
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SUPABASE_ANON_KEY
 );
-
 const server = new Server('https://api.testnet.minepi.com');
 
-// Timestamp iniziale (1 ora fa)
+// Recupera ultimo timestamp dalle environment
 let lastChecked = Date.now() - 1000 * 60 * 60;
 
 async function checkTransactions() {
-  console.log("🔄 Controllo nuove transazioni...");
+  console.log('🔄 Controllo nuove transazioni...');
 
   const payments = await server
     .payments()
@@ -44,14 +44,12 @@ async function checkTransactions() {
         .update({ credits: user.credits + amount })
         .eq('id', user.id);
 
-      await supabase
-        .from('transactions')
-        .insert({
-          id: record.id,
-          user_id: user.id,
-          amount,
-          type: 'deposit'
-        });
+      await supabase.from('transactions').insert({
+        id: record.id,
+        user_id: user.id,
+        amount,
+        type: 'deposit'
+      });
     }
   }
 
