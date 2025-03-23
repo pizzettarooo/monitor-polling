@@ -6,13 +6,14 @@ const supabase = createClient(
   process.env.SUPABASE_URL!,
   process.env.SUPABASE_ANON_KEY!
 )
+
 const server = new Server('https://api.testnet.minepi.com')
 
 // Recupera ultimo timestamp dalle environment (da aggiornare su Railway)
 let lastChecked = Date.now() - 1000 * 60 * 60
 
 async function checkTransactions() {
-  console.log('🔁 Controllo nuove transazioni...')
+  console.log('🔍 Controllo nuove transazioni...')
 
   const payments = await server
     .payments()
@@ -38,7 +39,7 @@ async function checkTransactions() {
       .single()
 
     if (user) {
-      console.log(`✅ Nuova ricarica da ${sender} per ${amount} Pi`)
+      console.log(`💸 Nuova ricarica da ${sender} per ${amount} Pi`)
       await supabase
         .from('users')
         .update({ credits: user.credits + amount })
@@ -57,4 +58,3 @@ async function checkTransactions() {
 }
 
 setInterval(checkTransactions, 60 * 1000)
-checkTransactions()
