@@ -7,6 +7,6 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.39.5",
-    "stellar-sdk": "^10.6.1"
+    "stellar-sdk": "^10.4.0"
   }
 }
