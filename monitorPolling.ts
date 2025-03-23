@@ -1,57 +1,60 @@
-import fetch from 'node-fetch';
-import { createClient } from '@supabase/supabase-js';
+import { createClient } from '@supabase/supabase-js'
+import { Server } from 'stellar-sdk'
 
-const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_ANON_KEY!);
-const STELLAR_API_URL = 'https://api.stellar.expert/explorer/testnet/account/';
-const SITE_WALLET = 'GCMEELHBN6VBVFGVRRD7PAGJZY63F3PWA4CL6QGXCYNMFPFL6J77B2RV';
+// Configurazioni
+const supabase = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_ANON_KEY!
+)
+const server = new Server('https://api.testnet.minepi.com')
 
-let lastTimestamp: number = Date.now();
+// Recupera ultimo timestamp dalle environment (da aggiornare su Railway)
+let lastChecked = Date.now() - 1000 * 60 * 60
 
-async function checkNewTransactions() {
-  try {
-    const res = await fetch(`${STELLAR_API_URL}${SITE_WALLET}/payments?limit=50&order=desc`);
-    const data = await res.json();
+async function checkTransactions() {
+  console.log('🔁 Controllo nuove transazioni...')
 
-    const newTxs = data._embedded.records.filter((tx: any) =>
-      tx.to === SITE_WALLET && new Date(tx.created_at).getTime() > lastTimestamp
-    );
+  const payments = await server
+    .payments()
+    .forAccount(process.env.SITE_WALLET!)
+    .order('desc')
+    .limit(10)
+    .call()
 
-    if (newTxs.length) {
-      console.log(`📥 Trovate ${newTxs.length} nuove transazioni.`);
+  for (const record of payments.records) {
+    const timestamp = new Date(record.created_at).getTime()
 
-      for (const tx of newTxs) {
-        const sender = tx.from;
-        const amount = parseFloat(tx.amount);
+    if (timestamp <= lastChecked) continue
+    if (record.to !== process.env.SITE_WALLET) continue
+    if (record.asset_type !== 'native') continue
 
-        const { data: user } = await supabase.from('users').select('id, credits').eq('wallet', sender).single();
-        if (!user) {
-          console.warn(`⚠️ Nessun utente registrato con wallet ${sender}`);
-          continue;
-        }
+    const sender = record.from
+    const amount = parseFloat(record.amount)
 
-        await supabase
-          .from('users')
-          .update({ credits: user.credits + Math.floor(amount) })
-          .eq('id', user.id);
+    const { data: user } = await supabase
+      .from('users')
+      .select('id, credits')
+      .eq('wallet', sender)
+      .single()
 
-        await supabase.from('transactions').insert({
-          id: tx.id,
-          user_id: user.id,
-          amount,
-          type: 'deposit'
-        });
+    if (user) {
+      console.log(`✅ Nuova ricarica da ${sender} per ${amount} Pi`)
+      await supabase
+        .from('users')
+        .update({ credits: user.credits + amount })
+        .eq('id', user.id)
 
-        console.log(`✅ Aggiornati i crediti per ${sender}: +${Math.floor(amount)} Pi`);
-      }
-
-      const latest = new Date(newTxs[0].created_at).getTime();
-      lastTimestamp = latest;
-    } else {
-      console.log('🔍 Nessuna nuova transazione trovata.');
+      await supabase.from('transactions').insert({
+        id: record.id,
+        user_id: user.id,
+        amount,
+        type: 'deposit'
+      })
     }
-  } catch (err) {
-    console.error('❌ Errore durante il polling:', err);
   }
+
+  lastChecked = Date.now()
 }
 
-setInterval(checkNewTransactions, 60 * 1000);
+setInterval(checkTransactions, 60 * 1000)
+checkTransactions()
