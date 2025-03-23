@@ -56,4 +56,4 @@ async function checkTransactions() {
   lastChecked = Date.now();
 }
 
-setInterval(checkTransactions, 60 * 1000); // Ogni minuto
+setInterval(checkTransactions, 20 * 1000); // Ogni minuto
